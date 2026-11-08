@@ -1,154 +1,115 @@
-<img width="1920" height="1200" alt="Grand Theft Auto  San Andreas Screenshot 2026 11 08 - 14 34 47 13" src="https://github.com/user-attachments/assets/5a158c5a-2a30-439a-b4b2-410c756e29ed" />
-# RADMIR CRMP — кастомный HUD (`RadmirHud.asi`)
+# RADMIR CRMP — кастомный HUD
 
-Кастомный HUD и информер захвата для RADMIR CRMP (Cohtml/HTML UI).
+Кастомный интерфейс для RADMIR CRMP: показывает здоровье, броню, голод, деньги, оружие и патроны, а также табло захвата с атакующей и защищающейся командами.
 
-Плагин не меняет `uiresources` и `manifest.json`: он внедряет готовый React-бандл
-в уже работающий UI-вьюпорт игры и перехватывает обновления официального HUD.
+## Для игроков: установка и запуск
 
-## Что внутри
+### Что скачать
+
+Для установки нужен готовый файл `RadmirHud.asi`. Его нужно скачать из раздела **Releases** этого репозитория, если там опубликован установочный архив.
+
+> Если в репозитории есть только исходный код и нет раздела Releases с готовым `.asi`, установить HUD простым копированием не получится: проект сначала нужно собрать. Инструкция для разработчиков находится в конце этого файла.
+
+### Установка
+
+1. Закройте игру.
+2. Откройте папку игры RADMIR CRMP. Обычно это:
+   `C:\Program Files (x86)\RADMIR Games\RADMIR CRMP`
+3. На всякий случай сохраните копию файлов, которые собираетесь заменить.
+4. Скопируйте `RadmirHud.asi` в папку игры — туда же, где находится `gta_sa.exe`.
+5. Запустите игру и войдите в мир. HUD должен появиться автоматически.
+
+В игре уже должен быть установлен ASI-загрузчик. Если в папке игры есть другие файлы `.asi` (например, `CLEO.asi` или `MoonLoader.asi`), загрузчик, скорее всего, уже есть. Не скачивайте случайные ASI-загрузчики с неизвестных сайтов.
+
+Для обычной игры **не нужно** копировать `hud.inject.js`, папки `src`, `dist`, `scripts`, `node_modules` или `.tools`. Встроенная в `.asi` версия HUD запускается самостоятельно. Внешний `hud.inject.js` предназначен для разработки и может включить диагностическую панель.
+
+### Управление и удаление
+
+- **F10** — повторно загрузить HUD, если рядом с плагином используется внешний `hud.inject.js`. Для обычной установки эта клавиша обычно не нужна.
+- Чтобы удалить HUD, закройте игру и переместите `RadmirHud.asi` из папки игры в другое место или удалите его. Исходные файлы игры плагин не изменяет.
+
+Если HUD не появился, сначала проверьте, что `RadmirHud.asi` лежит рядом с `gta_sa.exe`, а в игре работает ASI-загрузчик. Если проблема сохраняется, временно уберите `RadmirHud.asi` и обратитесь к автору проекта, приложив файл `RadmirHud.log`, если он создался.
+
+## Для разработчиков
+
+### Структура проекта
 
 | Путь | Назначение |
 | --- | --- |
 | `src/` | React-компоненты HUD, состояние и мост к официальному API |
-| `src/radmirBridge.ts` | Патч `getInterface` / `openInterface` / `closeInterface`, прокси `Hud.info`, перехват `Capture` |
-| `vite.inject.config.ts` | Сборка одного IIFE-файла `dist/hud.inject.js` с встроенным CSS |
-| `scripts/embed-to-cpp.mjs` | Превращает бандл в `asi_plugin/src/embedded_hud.h` |
-| `asi_plugin/src/dllmain.cpp` | ASI-плагин: поиск `cohtml.WindowsDesktop.dll`, хук `ViewImpl::ExecuteScript`, инъекция, F10 |
-| `asi_plugin/build-asi.bat` | Сборка `asi_plugin/RadmirHud.asi` (MSVC x86 или llvm-mingw i686) |
+| `src/radmirBridge.ts` | Перехват обновлений HUD и интерфейса захвата |
+| `vite.inject.config.ts` | Сборка одного IIFE-файла `dist/hud.inject.js` со встроенным CSS |
+| `scripts/embed-to-cpp.mjs` | Встраивание бандла в `asi_plugin/src/embedded_hud.h` |
+| `asi_plugin/src/dllmain.cpp` | ASI-плагин: установка хука, внедрение HUD и перезагрузка по F10 |
+| `asi_plugin/build-asi.bat` | Сборка Win32/x86 плагина через MSVC или llvm-mingw |
 
-## Сборка
+### Требования
+
+- Windows и RADMIR CRMP на базе 32-битного `gta_sa.exe`;
+- Node.js и npm;
+- для сборки `.asi` — Visual Studio C++ Build Tools с поддержкой x86 либо компилятор llvm-mingw i686.
+
+### Сборка
+
+Из корня проекта выполните:
 
 ```powershell
-cd C:\eradmir
-npm install
+npm ci
 npm run build:inject
 cmd /c asi_plugin\build-asi.bat
 ```
 
-`npm run build:inject` делает три вещи:
+`npm run build:inject` проверяет типы, создаёт `dist/hud.inject.js` и обновляет заголовок `asi_plugin/src/embedded_hud.h`. Скрипт `build-asi.bat` затем собирает `asi_plugin/RadmirHud.asi`.
 
-1. проверяет типы (`tsc --noEmit`);
-2. собирает минифицированный IIFE `dist/hud.inject.js` и встраивает CSS в `<style>`;
-3. генерирует `asi_plugin/src/embedded_hud.h`.
+Чтобы установить собранную версию, скопируйте `asi_plugin\RadmirHud.asi` в корень игры рядом с `gta_sa.exe`. Готовый `.asi` и `dist/` — результаты сборки; они не обязательны для хранения исходного кода в GitHub, если опубликованы отдельно в Releases.
 
-Результат: `asi_plugin/RadmirHud.asi` (Win32/x86, под `gta_sa.exe`).
+### Разработка и перезагрузка
 
-## Установка
+Плагин ищет внешний бандл в таком порядке:
 
-Скопировать в корень игры (`C:\Program Files (x86)\RADMIR Games\RADMIR CRMP`):
-
-- `asi_plugin\RadmirHud.asi` — обязательно;
-- `dist\hud.inject.js` — опционально, для режима разработки (см. ниже).
-
-ASI-загрузчик в игре уже есть (рядом лежат `MoonLoader.asi`, `CLEO.asi` и т.д.).
-
-## Как это работает
-
-- Плагин ждёт загрузки `cohtml.WindowsDesktop.dll`.
-- Находит `cohtml::View::ExecuteScript` по сигнатуре пролога, а слот 61 vtable
-  `ViewImpl` — по указателю на функцию (есть fallback на известные RVA).
-- Подменяет слот vtable на detour. Оригинальный вызов сохраняется и вызывается всегда.
-- Перед первым «UI-скриптом» (`Hud`, `getInterface`, `interface(`) внедряется бандл,
-  чтобы первый же апдейт HUD уже прошёл через мост. Есть fallback после 80 вызовов.
-- Бандл создаёт `#custom-radmir-hud-root` (fixed, `pointer-events: none`, `z-index: 9999`),
-  не трогая официальный `#app`.
-- Запуск HUD не зависит от таймеров и длительности логина. React монтируется по
-  игровому триггеру: появление штатного `.hud-radmir-info` в DOM или первый вызов
-  метода `Hud` (`setInterfaceParams`/`updateParams`). Если игрок долго сидит в меню,
-  HUD просто ждёт.
-- Первый рендер выполняется через `flushSync`, чтобы Cohtml не откладывал
-  concurrent-задачи React 18 на неопределённый срок.
-- В бандл встроены мини-полифиллы `URLSearchParams` и `queueMicrotask`: Cohtml их
-  не предоставляет, и без них падала инициализация хука `preview`.
-- `radmirBridge` подменяет `window.getInterface` и возвращает прокси для `Hud`/`Capture`:
-  - `Hud.info.health / armour / money / weapon / ammoInClip / totalAmmo`, а также
-    `hunger / breath / freeze / wanted / online / id / fastHealCount / fastFoodCount` → `window.updateRadmirHud`;
-  - `showGreenZoneTab / hideGreenZoneTab / showFishingZone / hideFishingZone / showGPS / hideGPS /
-    showPersonalTag / hidePersonalTag` → зоны и расстояния на радаре;
-  - ник и кейс-поинты читаются из `window.App.$store.getters['player/nickName']` и
-    `['player/casePoints']` (опрос раз в секунду, с fallback на `$store.state.player`);
-  - `openInterface('Capture', [...])`, `updateScoreboard*`, `close` → информер захвата
-    (первый участник — атака, второй — защита);
-  - официальные `.hud-radmir-info`, `.hud-hassle-info`, `.hud-mobile__info`,
-    `.hud-radmir-radar`, `.hud-hassle-radar` скрываются только после успешного commit
-    кастомного HUD; если React упал, штатный HUD остаётся видимым (fail-open).
-    Уведомления не затрагиваются.
-- Раскладка повторяет Amazing RP:
-  - справа сверху — время/дата, ник (+ ID, если клиент его отдаёт), логотип **RADMIR**
-    с номером сервера (`$store.getters['player/serverId']`), иконка оружия и
-    пилюли (броня, здоровье с полосой, голод, деньги, патроны);
-  - под кластером — статус-строка: звёзды розыска, заморозка, дыхание (каждый
-    элемент появляется только когда активен);
-  - по центру снизу — информер захвата «Защита / Атака» с таймером и названиями
-    банд;
-  - штатный радар и чат не изменяются.
-- CSS скоупится под `#custom-radmir-hud-root`, Tailwind preflight отключён — стили
-  официального интерфейса не затрагиваются.
-
-## Режим разработки и F10
-
-Порядок загрузки бандла:
-
-1. `hud.inject.js` рядом с `.asi`;
-2. `scripts\hud.inject.js` рядом с `.asi`;
+1. `hud.inject.js` рядом с `RadmirHud.asi`;
+2. `scripts\hud.inject.js` рядом с `RadmirHud.asi`;
 3. встроенный бандл из `embedded_hud.h`.
 
-Поэтому для итераций достаточно держать `hud.inject.js` в корне игры:
+Для быстрой проверки скопируйте собранный файл в папку игры:
 
 ```powershell
-npm run build:inject
 Copy-Item dist\hud.inject.js "C:\Program Files (x86)\RADMIR Games\RADMIR CRMP\hud.inject.js" -Force
 ```
 
-Затем нажать **F10** в игре — бандл переинжектится без перезапуска.
-F10 читается через `GetAsyncKeyState`, поэтому работает и в полноэкранном режиме.
-Повторные срабатывания при удержании клавиши ограничены (не чаще одного раза в секунду).
+Затем нажмите **F10** в игре. Внешний бандл включает диагностическую панель. Чтобы вернуться к встроенной версии, удалите внешний `hud.inject.js` из папки игры.
 
-Если удалить `hud.inject.js`, плагин будет использовать встроенную копию.
+### Как работает плагин
 
-### Диагностическая панель
+- Плагин ожидает загрузки `cohtml.WindowsDesktop.dll`, ищет `cohtml::View::ExecuteScript` по сигнатуре и подменяет соответствующий слот vtable. Оригинальный вызов продолжает выполняться.
+- Бандл внедряется в игровой UI-вьюпорт и создаёт `#custom-radmir-hud-root`; официальный `#app` не заменяется.
+- React монтируется по игровому триггеру, когда HUD готов. Первый рендер выполняется через `flushSync`.
+- Мост перехватывает `Hud.info`, методы интерфейса `Hud` и `Capture`; данные передаются в React через `window.updateRadmirHud`.
+- В параметрах захвата первый участник считается атакующей командой, второй — защищающейся. Табло отображает их соответственно под подписями «Атака» и «Защита».
+- Официальный HUD скрывается только после успешного отображения кастомного. Если React не запустился, сохраняется штатный HUD.
+- CSS ограничен корнем кастомного HUD; штатный радар, чат и уведомления не изменяются.
+- Внешний бандл или файл `RadmirHud.debug` включает диагностическую панель. Рядом с `.asi` также создаётся `RadmirHud.log`.
 
-Диагностика включается автоматически, когда найден внешний `hud.inject.js`
-(режим разработчика), либо если рядом с `.asi` лежит файл `RadmirHud.debug`.
-В этом режиме в левом нижнем углу появляется панель:
+### Предпросмотр и диагностика
 
-- `Bundle evaluated; waiting for the game Hud interface trigger.` — бандл принят Cohtml,
-  HUD ждёт входа в мир;
-- `JAVASCRIPT ERROR: ...` — ошибка выполнения (например, отсутствующий API движка);
-- `React render error: ...` — ошибка рендера React;
-- `HUD rendered ...` — панель успешно отрисована, сообщение скрывается.
-
-У обычного игрока внешнего файла и маркера нет, поэтому диагностика не показывается.
-
-## Лог и диагностика
-
-Рядом с `RadmirHud.asi` создаётся `RadmirHud.log`:
-
-- `hook installed` — хук установлен;
-- `UI view detected` / `UI view fallback` — выбран вьюпорт;
-- `using external bundle` / `using embedded bundle` — источник бандла;
-- `injecting N bytes` — инъекция выполнена;
-- `vtable scan failed` — сработал fallback слота, стоит проверить версию `cohtml`.
-
-Если HUD не появился:
-
-1. проверить, что игра 32-битная и `RadmirHud.asi` лежит в корне;
-2. посмотреть `RadmirHud.log` — возможно, `cohtml.WindowsDesktop.dll` ещё не загружен;
-3. убедиться, что другой плагин не патчит тот же слот vtable;
-4. нажать F10 после обновления `hud.inject.js`.
-
-## Браузерный предпросмотр
+Запустите локальный предпросмотр командой:
 
 ```powershell
 npm run dev
 ```
 
-В dev-режиме открывается предпросмотр с демо-значениями. В production-бандле
-предпросмотр выключен; принудительно включается параметром `?debug=1`.
+Для принудительного предпросмотра production-бандла используется параметр `?debug=1`.
 
-## Ограничения
+В диагностической панели:
 
-- Официальный `Capture` не передаёт «игроков в зоне» и номер территории,
-  поэтому эти строки скрываются, пока значения равны нулю.
-- Плагин не отправляет никаких сетевых запросов и не изменяет файлы игры.
+- `Bundle evaluated; waiting for the game Hud interface trigger.` означает, что бандл запущен и ждёт входа в игровой мир;
+- `JAVASCRIPT ERROR: ...` показывает ошибку JavaScript;
+- `React render error: ...` указывает на ошибку отображения React;
+- `HUD rendered ...` означает, что HUD успешно отображён.
+
+В `RadmirHud.log` полезны строки `hook installed`, `UI view detected`, `using external bundle` или `using embedded bundle`, `injecting N bytes`. Сообщение `vtable scan failed` означает, что использован запасной адрес; при проблемах проверьте совместимость с версией Cohtml.
+
+### Ограничения
+
+- Официальный интерфейс захвата не предоставляет число игроков в зоне и номер территории, поэтому эти значения могут не отображаться.
+- Плагин не отправляет сетевые запросы и не изменяет файлы `uiresources` или `manifest.json`.
