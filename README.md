@@ -1,3 +1,4 @@
+<img width="1920" height="1200" alt="Grand Theft Auto  San Andreas Screenshot 2026 11 08 - 14 34 47 13" src="https://github.com/user-attachments/assets/5a158c5a-2a30-439a-b4b2-410c756e29ed" />
 # RADMIR CRMP — кастомный HUD (`RadmirHud.asi`)
 
 Кастомный HUD и информер захвата для RADMIR CRMP (Cohtml/HTML UI).
