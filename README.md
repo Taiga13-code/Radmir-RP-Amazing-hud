@@ -1,3 +1,5 @@
+<img width="1920" height="1200" alt="Grand Theft Auto  San Andreas Screenshot 2026 11 08 - 14 34 47 13" src="https://github.com/user-attachments/assets/536c3c46-03a5-4a6c-a579-69aaa8cccd30" />
+
 # RADMIR CRMP — кастомный HUD
 
 Кастомный интерфейс для RADMIR CRMP: показывает здоровье, броню, голод, деньги, оружие и патроны, а также табло захвата с атакующей и защищающейся командами.
