@@ -416,6 +416,14 @@ function wrapHud(hud: HudInterfaceLike): HudInterfaceLike {
     publishInfo(hud.info as HudInfoLike);
   }
 
+  // Patch missing methods directly on the object so game's own code doesn't crash
+  const missingMethods = ['hideInfo', 'showInfo'];
+  for (const method of missingMethods) {
+    if (!(method in hud)) {
+      (hud as Record<string, unknown>)[method] = function () { return undefined; };
+    }
+  }
+
   const proxy = new Proxy(hud, {
     get(target, property, receiver) {
       if (property === 'info') {
@@ -691,6 +699,17 @@ function makeGetInterfaceWrapper(getCurrent: () => Function | null): Function {
     }
 
     const iface = current.call(window, name);
+    
+    // Patch Hud object IMMEDIATELY, before game caches it
+    if (iface && typeof iface === 'object' && name === 'Hud') {
+      const missingMethods = ['hideInfo', 'showInfo'];
+      for (const method of missingMethods) {
+        if (!(method in iface)) {
+          (iface as Record<string, unknown>)[method] = function () { return undefined; };
+        }
+      }
+    }
+    
     return wrapInterface(String(name), iface);
   };
 }
@@ -706,7 +725,29 @@ function makeOpenInterfaceWrapper(getCurrent: () => Function | null): Function {
       return undefined;
     }
 
-    return current.apply(window, [name, params, ...rest]);
+    // For Hud interface, intercept and return a safe wrapper immediately
+    // to prevent game's hideInfo calls from crashing
+    if (name === 'Hud') {
+      const result = current.apply(window, [name, params, ...rest]);
+      
+      if (result && typeof result === 'object') {
+        // Patch missing methods directly on the object
+        const missingMethods = ['hideInfo', 'showInfo'];
+        for (const method of missingMethods) {
+          if (!(method in result)) {
+            (result as Record<string, unknown>)[method] = function () { 
+              console.log(`[RADMIR HUD] Ignoring removed method: ${method}`);
+              return undefined; 
+            };
+          }
+        }
+      }
+      
+      return wrapInterface(String(name), result);
+    }
+
+    const result = current.apply(window, [name, params, ...rest]);
+    return wrapInterface(String(name), result);
   };
 }
 
