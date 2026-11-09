@@ -7,9 +7,6 @@ import { installRadmirBridge } from './radmirBridge';
 import { HudProvider } from './state/HudProvider';
 import './index.css';
 
-// Install bridge IMMEDIATELY, before game caches getInterface('Hud')
-installRadmirBridge();
-
 const HOST_ID = 'custom-radmir-hud-root';
 const STOCK_HUD_SELECTOR = '.hud-radmir-info, .hud-hassle-info, .hud-mobile__info';
 let hudMounted = false;
@@ -165,6 +162,7 @@ function boot(): void {
     }
 
     hudBooted = true;
+    installRadmirBridge();
     window.__radmirHudOnReady = onGameHudReady;
 
     // Game update may have renamed stock HUD nodes, so mount immediately.
