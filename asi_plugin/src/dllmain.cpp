@@ -388,11 +388,12 @@ bool ShouldInject(void* view, const char* script) {
       return previous == nullptr || previous == view;
     }
 
-    if (InterlockedCompareExchange(&g_executeCount, 0, 0) >= 80) {
+    // Снижен порог с 80 до 12 для более раннего внедрения
+    if (InterlockedCompareExchange(&g_executeCount, 0, 0) >= 12) {
       void* previous = InterlockedCompareExchangePointer(
           reinterpret_cast<PVOID volatile*>(&g_uiView), view, nullptr);
       if (previous == nullptr) {
-        Logf("UI view fallback: %p", view);
+        Logf("UI view fallback: %p (after %ld calls)", view, InterlockedCompareExchange(&g_executeCount, 0, 0));
       }
       return previous == nullptr || previous == view;
     }

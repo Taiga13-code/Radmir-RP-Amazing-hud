@@ -39,12 +39,23 @@ class HudErrorBoundary extends Component<{ children: ReactNode }, HudErrorBounda
 }
 
 function mountHud(): void {
+  try {
+    window.__radmirHudReport?.('mountHud() called', false);
+  } catch (e) {
+    console.log('[RADMIR HUD] mountHud called');
+  }
+
   if (hudMounted) {
     return;
   }
 
   const parent = document.body;
   if (!parent) {
+    try {
+      window.__radmirHudReport?.('mountHud: no document.body', true);
+    } catch (e) {
+      console.error('[RADMIR HUD] no document.body');
+    }
     return;
   }
 
@@ -149,6 +160,12 @@ function waitForGameHudTrigger(): void {
 }
 
 function boot(): void {
+  try {
+    window.__radmirHudReport?.('boot() called', false);
+  } catch (e) {
+    console.log('[RADMIR HUD] boot called');
+  }
+
   if (hudBooted) {
     return;
   }
@@ -172,9 +189,29 @@ function boot(): void {
   }
 
   hudBooted = true;
+  
+  try {
+    window.__radmirHudReport?.('installing RadmirBridge', false);
+  } catch (e) {
+    console.log('[RADMIR HUD] installing bridge');
+  }
+  
   installRadmirBridge();
   window.__radmirHudOnReady = onGameHudReady;
+  
+  try {
+    window.__radmirHudReport?.('waiting for game HUD trigger', false);
+  } catch (e) {
+    console.log('[RADMIR HUD] waiting for trigger');
+  }
+  
   waitForGameHudTrigger();
+}
+
+try {
+  window.__radmirHudReport?.('Bundle evaluated; waiting for the game Hud interface trigger.', false);
+} catch (e) {
+  console.log('[RADMIR HUD] Bundle evaluated');
 }
 
 boot();
