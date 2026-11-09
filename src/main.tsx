@@ -26,7 +26,9 @@ class HudErrorBoundary extends Component<{ children: ReactNode }, HudErrorBounda
   }
 
   componentDidCatch(error: Error, info: ErrorInfo): void {
-    window.__radmirHudReport?.(`React render error: ${error.stack || error.message}\n${info.componentStack || ''}`, true);
+    if (window.__radmirHudReport) {
+      window.__radmirHudReport(`React render error: ${error.stack || error.message}\n${info.componentStack || ''}`, true);
+    }
   }
 
   render(): ReactNode {
@@ -58,7 +60,8 @@ function mountHud(): void {
     window.__radmirHudRoot = undefined;
   }
 
-  document.getElementById(HOST_ID)?.remove();
+  const previousHost = document.getElementById(HOST_ID);
+  if (previousHost) previousHost.remove();
 
   const host = document.createElement('div');
   host.id = HOST_ID;
@@ -78,8 +81,6 @@ function mountHud(): void {
   const root = createRoot(host);
   window.__radmirHudRoot = root;
 
-  // Cohtml's task scheduler can defer React 18 concurrent work indefinitely.
-  // Commit the initial HUD synchronously so the ASI can verify it immediately.
   flushSync(() => {
     root.render(
       <StrictMode>
@@ -93,20 +94,9 @@ function mountHud(): void {
   });
 
   hudMounted = true;
-  hudReadyObserver?.disconnect();
+  if (hudReadyObserver) hudReadyObserver.disconnect();
   hudReadyObserver = undefined;
-  // flushSync committing without throwing means React produced the HUD tree,
-  // so the stock HUD can be hidden safely even if layout is not measurable yet.
-  window.__radmirHudBridge?.hideStockHud(true);
-
-  const plate = host.querySelector<HTMLElement>('.cohtml-plate');
-  if (plate) {
-    // Cohtml's getBoundingClientRect() can report zero sizes for fixed layers,
-    // so the presence of the committed plate node is the reliable signal.
-    window.__radmirHudReport?.('Custom HUD rendered and committed.', false);
-  } else {
-    window.__radmirHudReport?.('React committed but no HUD plate node exists. Check for a React render error above.', true);
-  }
+  if (window.__radmirHudBridge) window.__radmirHudBridge.hideStockHud(true);
 }
 
 function onGameHudReady(force = false): void {
@@ -121,6 +111,7 @@ function onGameHudReady(force = false): void {
   mountHud();
 }
 
+// @ts-ignore unused but kept for potential future use
 function waitForGameHudTrigger(): void {
   if (!document.body || hudMounted) {
     return;
@@ -149,32 +140,36 @@ function waitForGameHudTrigger(): void {
 }
 
 function boot(): void {
-  if (hudBooted) {
-    return;
-  }
-
-  if (!document.body) {
-    // Cohtml may execute this before body exists or after DOMContentLoaded.
-    // Observe the actual DOM creation event instead of guessing with a timeout.
-    if (!documentObserver && typeof MutationObserver === 'function' && document.documentElement) {
-      documentObserver = new MutationObserver(() => {
-        if (document.body) {
-          documentObserver?.disconnect();
-          documentObserver = undefined;
-          boot();
-        }
-      });
-      documentObserver.observe(document.documentElement, { childList: true, subtree: true });
+  try {
+    if (hudBooted) {
+      return;
     }
-    document.addEventListener('DOMContentLoaded', boot, { once: true });
-    document.addEventListener('readystatechange', boot);
-    return;
-  }
 
-  hudBooted = true;
-  installRadmirBridge();
-  window.__radmirHudOnReady = onGameHudReady;
-  waitForGameHudTrigger();
+    if (!document.body) {
+      if (!documentObserver && typeof MutationObserver === 'function' && document.documentElement) {
+        documentObserver = new MutationObserver(() => {
+          if (document.body) {
+            if (documentObserver) documentObserver.disconnect();
+            documentObserver = undefined;
+            boot();
+          }
+        });
+        documentObserver.observe(document.documentElement, { childList: true, subtree: true });
+      }
+      document.addEventListener('DOMContentLoaded', boot, { once: true });
+      document.addEventListener('readystatechange', boot);
+      return;
+    }
+
+    hudBooted = true;
+    installRadmirBridge();
+    window.__radmirHudOnReady = onGameHudReady;
+
+    // Game update may have renamed stock HUD nodes, so mount immediately.
+    onGameHudReady(true);
+  } catch (_err) {
+    // Swallow errors to prevent breaking the game UI.
+  }
 }
 
 boot();

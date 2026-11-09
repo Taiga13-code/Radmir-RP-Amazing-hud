@@ -424,6 +424,13 @@ function wrapHud(hud: HudInterfaceLike): HudInterfaceLike {
       }
 
       const value = Reflect.get(target, property, receiver);
+
+      // Game updates may remove methods (e.g. hideInfo). Return a safe no-op
+      // so callers like the stock UI scripts don't crash on undefined().
+      if (value === undefined && typeof property === 'string') {
+        return function () { return undefined; };
+      }
+
       if (typeof value !== 'function') {
         return value;
       }
