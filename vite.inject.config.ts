@@ -125,7 +125,7 @@ export default defineConfig({
   },
   plugins: [react(), inlineCss()],
   build: {
-    target: 'es2018',
+    target: 'es2015',
     minify: 'esbuild',
     cssCodeSplit: false,
     assetsInlineLimit: 100000000,
