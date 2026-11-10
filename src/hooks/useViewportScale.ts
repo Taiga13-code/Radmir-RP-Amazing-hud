@@ -10,6 +10,14 @@ export interface ViewportMetrics {
 const DESIGN_WIDTH = 1920;
 const DESIGN_HEIGHT = 1080;
 
+// Interior transitions resize the game UI view in bursts and may report
+// transitional sizes (or skip the final resize event entirely). Committing
+// every event made the HUD jump around ("убегает") inside interiors, so
+// measurements are debounced and re-taken at commit time, with a slow poll
+// as a self-healing fallback.
+const COMMIT_DELAY_MS = 250;
+const POLL_INTERVAL_MS = 1000;
+
 function measure(): ViewportMetrics {
   const width = window.innerWidth;
   const height = window.innerHeight;
@@ -29,21 +37,46 @@ function measure(): ViewportMetrics {
   return { width, height, scale, safe };
 }
 
+function sameSize(a: ViewportMetrics, b: ViewportMetrics): boolean {
+  return a.width === b.width && a.height === b.height;
+}
+
 export function useViewportScale(): ViewportMetrics {
   const [metrics, setMetrics] = useState<ViewportMetrics>(() => measure());
 
   useEffect(() => {
-    const update = () => {
-      setMetrics(measure());
+    let commitTimer: number | undefined;
+    let pollTimer: number | undefined;
+
+    const commit = () => {
+      const fresh = measure();
+      setMetrics((prev) => (sameSize(prev, fresh) ? prev : fresh));
     };
 
-    update();
-    window.addEventListener('resize', update);
-    window.visualViewport?.addEventListener('resize', update);
+    const scheduleCommit = () => {
+      if (commitTimer !== undefined) {
+        window.clearTimeout(commitTimer);
+      }
+      commitTimer = window.setTimeout(commit, COMMIT_DELAY_MS);
+    };
+
+    // Some view resizes (e.g. interior enter/exit) never fire a resize
+    // event, so re-check the real size periodically.
+    pollTimer = window.setInterval(scheduleCommit, POLL_INTERVAL_MS);
+
+    scheduleCommit();
+    window.addEventListener('resize', scheduleCommit);
+    window.visualViewport?.addEventListener('resize', scheduleCommit);
 
     return () => {
-      window.removeEventListener('resize', update);
-      window.visualViewport?.removeEventListener('resize', update);
+      if (commitTimer !== undefined) {
+        window.clearTimeout(commitTimer);
+      }
+      if (pollTimer !== undefined) {
+        window.clearInterval(pollTimer);
+      }
+      window.removeEventListener('resize', scheduleCommit);
+      window.visualViewport?.removeEventListener('resize', scheduleCommit);
     };
   }, []);
 
