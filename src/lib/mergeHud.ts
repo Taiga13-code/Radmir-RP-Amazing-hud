@@ -132,6 +132,7 @@ export function mergeHud(prev: HudState, patch: HudPatch): HudState {
     point: patch.point === undefined ? prev.point : mergeZoneDistance(prev.point, patch.point),
     capt: prev.capt,
     radar: prev.radar,
+    hidden: patch.hidden === undefined ? prev.hidden : Boolean(patch.hidden),
   };
 
   if (patch.capt) {

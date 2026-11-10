@@ -59,6 +59,7 @@ function createInitialHud(preview: boolean): HudState {
       defenderScore: 0,
       defenderInZone: 0,
     },
+    hidden: false,
   };
 }
 

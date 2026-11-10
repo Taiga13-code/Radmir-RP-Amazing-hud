@@ -135,6 +135,25 @@ std::string ReadFileBytes(const std::string& path) {
   return data;
 }
 
+std::string LoadHudConfig() {
+  // RadmirHud.json рядом с плагином: {"hide-interfaces": [...],
+  // "show-interfaces": [...]} — какие интерфейсы скрывают HUD, а какие нет.
+  const std::string directory = ModuleDirectory();
+  if (directory.empty()) {
+    return {};
+  }
+
+  const std::string configPath = directory + "RadmirHud.json";
+  const std::string config = ReadFileBytes(configPath);
+  if (config.empty()) {
+    return {};
+  }
+
+  Logf("hud config loaded: %s (%u bytes)", configPath.c_str(),
+       static_cast<unsigned>(config.size()));
+  return config;
+}
+
 std::string LoadHudSource() {
   const std::string directory = ModuleDirectory();
   if (!directory.empty()) {
@@ -426,7 +445,18 @@ void InjectIntoView(void* view) {
     original(view, nullptr, DiagnosticBootstrap());
   }
 
-  source += "\n//# sourceURL=radmir-hud.inject.js\n";
+  std::string config = LoadHudConfig();
+  if (!config.empty()) {
+    // Конфиг выставляется до бандла, чтобы мост прочитал его при старте.
+    std::string bootstrap = "window.__radmirHudConfig=";
+    bootstrap += config;
+    bootstrap += ";\n";
+    bootstrap += source;
+    bootstrap += "\n//# sourceURL=radmir-hud.inject.js\n";
+    source = std::move(bootstrap);
+  } else {
+    source += "\n//# sourceURL=radmir-hud.inject.js\n";
+  }
 
   Logf("injecting %u bytes into view %p", static_cast<unsigned>(source.size()), view);
   original(view, nullptr, source.c_str());

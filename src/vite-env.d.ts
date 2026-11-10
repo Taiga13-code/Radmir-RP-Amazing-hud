@@ -29,6 +29,8 @@ declare global {
     __radmirCaptureVisible?: boolean;
     __radmirCaptureWatchdog?: number;
     __radmirPlayerMetaWatchdog?: number;
+    /** Конфиг из RadmirHud.json, внедряется ASI-плагином перед бандлом. */
+    __radmirHudConfig?: unknown;
   }
 }
 
