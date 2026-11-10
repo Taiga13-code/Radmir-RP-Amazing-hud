@@ -425,12 +425,6 @@ function wrapHud(hud: HudInterfaceLike): HudInterfaceLike {
 
       const value = Reflect.get(target, property, receiver);
 
-      // Game updates may remove methods (e.g. hideInfo). Return a safe no-op
-      // so callers like the stock UI scripts don't crash on undefined().
-      if (value === undefined && typeof property === 'string') {
-        return function () { return undefined; };
-      }
-
       if (typeof value !== 'function') {
         return value;
       }
@@ -736,14 +730,63 @@ function installFunctionAccessor(name: string, factory: MethodFactory): void {
   let current: Function | null =
     typeof target[name] === 'function' ? (target[name] as Function) : null;
 
+  // Глубина повторного входа. Сторонние скрипты (например, aTools из
+  // loader-js) оборачивают уже установленный нами wrapper в свой Proxy:
+  //   window.openInterface = new Proxy(window.openInterface, {...})
+  // Их Proxy в качестве target получает наш wrapper, а наш сеттер запоминает
+  // их Proxy как current. Без защиты это даёт вечную рекурсию
+  // (wrapper -> proxy -> wrapper -> proxy -> ...) и переполнение стека,
+  // которое ломает диалоги и меню игры. При повторном входе вызываем
+  // базовую оригинальную функцию напрямую.
+  let depth = 0;
+  const base: { fn: Function | null } = { fn: null };
+
+  // Базовой считаем только настоящую игровую функцию: она была в свойстве до
+  // первой установки нашего акцессора (обычное data-свойство без геттера).
+  // Функции, обёрнутые вокруг нашего wrapper (Proxy от других скриптов),
+  // выставляют маркер при чтении и базой не считаются.
+  const hadPlainValue = !descriptor || !descriptor.get;
+  if (hadPlainValue) {
+    base.fn = current;
+  }
+
   const wrapper = factory(() => current);
+  const guarded = function (this: unknown, ...args: unknown[]) {
+    if (depth > 0) {
+      const fallback = base.fn ?? current;
+      if (!fallback) {
+        return undefined;
+      }
+      return fallback.apply(this, args);
+    }
+
+    depth += 1;
+    try {
+      return wrapper.apply(this, args);
+    } finally {
+      depth -= 1;
+    }
+  };
+  (guarded as unknown as InterfaceObject).__radmirAccessor = name;
 
   Object.defineProperty(target, name, {
     configurable: true,
     enumerable: true,
-    get: () => wrapper,
+    get: () => guarded,
     set: (value: unknown) => {
-      current = typeof value === 'function' ? (value as Function) : null;
+      if (typeof value === 'function') {
+        const fn = value as Function;
+        current = fn;
+        // Proxy от сторонних скриптов, обёрнутый вокруг нашего wrapper,
+        // прозрачен для чтения свойств и вернёт наш маркер. Такой хвост
+        // уже заканчивается на базовой функции, поэтому base не меняем.
+        if ((fn as unknown as InterfaceObject).__radmirAccessor !== name) {
+          base.fn = fn;
+        }
+      } else {
+        current = null;
+        base.fn = null;
+      }
     },
   });
 
@@ -756,7 +799,7 @@ function installFunctionAccessor(name: string, factory: MethodFactory): void {
       return;
     }
 
-    if ((target[name] as Function | undefined) !== wrapper) {
+    if ((target[name] as Function | undefined) !== guarded) {
       window.clearInterval(guard);
       installFunctionAccessor(name, factory);
     }
