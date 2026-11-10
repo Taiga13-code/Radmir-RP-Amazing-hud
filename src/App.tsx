@@ -29,7 +29,7 @@ const previewBackdropStyle: CSSProperties = {
 
 export function App() {
   const { scale, safe } = useViewportScale();
-  const { preview } = useHud();
+  const { preview, hud } = useHud();
   const hudSafe = Math.max(4, Math.round(safe * 0.35));
 
   return (
@@ -52,15 +52,19 @@ export function App() {
         }}
       />
 
-      <ScaledAnchor origin="top right" scale={scale} safe={hudSafe}>
-        <GameHud />
-      </ScaledAnchor>
+      {hud.hidden ? null : (
+        <>
+          <ScaledAnchor origin="top right" scale={scale} safe={hudSafe}>
+            <GameHud />
+          </ScaledAnchor>
 
-      <ScaledAnchor origin="bottom center" scale={scale} safe={safe}>
-        <CaptInformer />
-      </ScaledAnchor>
+          <ScaledAnchor origin="bottom center" scale={scale} safe={safe}>
+            <CaptInformer />
+          </ScaledAnchor>
 
-      <KeyHints />
+          <KeyHints />
+        </>
+      )}
     </div>
   );
 }

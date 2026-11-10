@@ -51,6 +51,49 @@ const STOCK_HUD_SELECTORS = [
   '.capture-scoreboard',
 ];
 
+interface RadmirHudConfig {
+  'hide-interfaces'?: unknown;
+  'show-interfaces'?: unknown;
+}
+
+interface HudVisibilityConfig {
+  hide: Set<string>;
+  show: Set<string>;
+}
+
+function readConfigNames(value: unknown): Set<string> {
+  const names = new Set<string>();
+
+  if (!Array.isArray(value)) {
+    return names;
+  }
+
+  for (const item of value) {
+    if (typeof item === 'string' && item.trim() !== '') {
+      names.add(item.trim().toLowerCase());
+    }
+  }
+
+  return names;
+}
+
+let hudVisibilityConfig: HudVisibilityConfig | null = null;
+
+function getHudVisibilityConfig(): HudVisibilityConfig {
+  if (!hudVisibilityConfig) {
+    const raw = (window as unknown as InterfaceObject).__radmirHudConfig as
+      | RadmirHudConfig
+      | undefined;
+
+    hudVisibilityConfig = {
+      hide: readConfigNames(raw?.['hide-interfaces']),
+      show: readConfigNames(raw?.['show-interfaces']),
+    };
+  }
+
+  return hudVisibilityConfig;
+}
+
 const wrappedObjects = new WeakMap<object, object>();
 const pendingPatches: HudPatch[] = [];
 
@@ -392,6 +435,21 @@ function afterHudMethod(hud: HudInterfaceLike, name: string, args: unknown[]): v
   }
 
   const key = name.toLowerCase();
+
+  // Игра сама говорит, когда HUD нужно скрыть: полноэкранные интерфейсы
+  // (MainMenu, PauseMenu, FastMap, ...) вызывают Hud.hideInfo(),
+  // при закрытии — Hud.openInfo(). Исключения настраиваются в
+  // RadmirHud.json рядом с плагином.
+  if (key === 'hideinfo') {
+    publish({ hidden: true });
+    return;
+  }
+
+  if (key === 'openinfo' || key === 'showinfo') {
+    publish({ hidden: false });
+    return;
+  }
+
   if (key === 'setinterfaceparams' || key === 'updateparams') {
     applyHudPayload(args[0]);
     return;
@@ -691,6 +749,9 @@ function makeGetInterfaceWrapper(getCurrent: () => Function | null): Function {
 
 function makeOpenInterfaceWrapper(getCurrent: () => Function | null): Function {
   return function (this: unknown, name: string, params?: unknown, ...rest: unknown[]) {
+    const key = String(name).toLowerCase();
+    const config = getHudVisibilityConfig();
+
     if (isCaptureName(String(name))) {
       applyCaptureParams(params);
     }
@@ -700,22 +761,37 @@ function makeOpenInterfaceWrapper(getCurrent: () => Function | null): Function {
       return undefined;
     }
 
-    return current.apply(window, [name, params, ...rest]);
+    const result = current.apply(window, [name, params, ...rest]);
+
+    // Интерфейсы из hide-interfaces скрывают HUD, из show-interfaces —
+    // принудительно оставляют его видимым (например, меню автомобиля).
+    if (config.hide.has(key)) {
+      publish({ hidden: true });
+    } else if (config.show.has(key)) {
+      publish({ hidden: false });
+    }
+
+    return result;
   };
 }
 
 function makeCloseInterfaceWrapper(getCurrent: () => Function | null): Function {
   return function (this: unknown, name: string, ...rest: unknown[]) {
+    const key = String(name).toLowerCase();
+    const config = getHudVisibilityConfig();
+
     if (isCaptureName(String(name))) {
       publishCapture({ visible: false });
     }
 
     const current = getCurrent();
-    if (!current) {
-      return undefined;
+    const result = current ? current.apply(window, [name, ...rest]) : undefined;
+
+    if (config.hide.has(key)) {
+      publish({ hidden: false });
     }
 
-    return current.apply(window, [name, ...rest]);
+    return result;
   };
 }
 

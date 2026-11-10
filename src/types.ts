@@ -59,6 +59,8 @@ export interface HudState {
   point: ZoneDistance;
   capt: CaptState;
   radar?: RadarState;
+  /** Полноэкранное меню открыто — HUD скрыт. */
+  hidden: boolean;
 }
 
 export interface CaptPatch {
@@ -99,6 +101,8 @@ export interface HudPatch {
   point?: ZoneDistance;
   capt?: CaptPatch;
   radar?: RadarState;
+  /** true — скрыть HUD (полноэкранное меню), false — показать. */
+  hidden?: boolean;
 }
 
 export const INITIAL_HUD: HudState = {
@@ -136,6 +140,7 @@ export const INITIAL_HUD: HudState = {
     defenderScore: 1,
     defenderInZone: 2,
   },
+  hidden: false,
   radar: {
     rotation: 32,
     x: 1240,
